@@ -1,0 +1,58 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.feature_selection import mutual_info_classif
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Step 1: Load and preprocess data
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/forest-fires/forestfires.csv"
+df = pd.read_csv(url)
+
+# Label encode 'month' and 'day'
+le = LabelEncoder()
+df['month'] = le.fit_transform(df['month'])
+df['day'] = le.fit_transform(df['day'])
+
+# Step 2: Convert target into classification
+df['fire'] = (df['area'] > 0).astype(int)  # 1 if fire, 0 otherwise
+
+# Step 3: Split into features and target
+X = df.drop(['area', 'fire'], axis=1)
+y = df['fire']
+
+# Step 4: Information Gain for classification
+ig = mutual_info_classif(X, y, random_state=42)
+feature_scores = {X.columns[i]: ig[i] for i in range(len(X.columns))}
+sorted_features = sorted(feature_scores.items(), key=lambda x: x[1], reverse=True)
+
+# Print feature importance
+print("\nFeature Importance (Info Gain for Classification):")
+for feature, score in sorted_features:
+    print(f"{feature}: {round(score, 4)}")
+
+# Step 5: Select top 8 features
+top_features = [feature for feature, score in sorted_features[:8]]
+X = X[top_features]
+
+# Step 6: Scale
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Step 7: Train/Test Split
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
+
+# Step 8: Train Classifier
+clf = RandomForestClassifier(random_state=42)
+clf.fit(X_train, y_train)
+
+# Step 9: Predict and Evaluate
+y_pred = clf.predict(X_test)
+print("\n Classification Report:")
+print(classification_report(y_test, y_pred))
+
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
