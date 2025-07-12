@@ -1,0 +1,35 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import shapiro, zscore
+
+# Load data
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/forest-fires/forestfires.csv"
+df = pd.read_csv(url)
+
+# Label encode categorical columns
+from sklearn.preprocessing import LabelEncoder
+le = LabelEncoder()
+df['month'] = le.fit_transform(df['month'])
+df['day'] = le.fit_transform(df['day'])
+
+# Exclude target column
+features = df.drop('area', axis=1).columns
+
+# Loop through features to check normality and outliers
+for col in features:
+    print(f"\n Analyzing Feature: {col}")
+
+    # 1. Normality test (Shapiro-Wilk)
+    stat, p = shapiro(df[col])
+    print(f"   Shapiro-Wilk p-value: {p:.4f} → {'Normal' if p > 0.05 else 'Not normal'}")
+
+    # 2. Plot distribution
+    sns.histplot(df[col], kde=True)
+    plt.title(f"Distribution: {col}")
+    plt.show()
+
+    # 3. Detect outliers using Z-score
+    z_scores = zscore(df[col])
+    outliers = df[(z_scores > 3) | (z_scores < -3)]
+    print(f"   Number of outliers: {len(outliers)}")
