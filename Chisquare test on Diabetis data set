@@ -1,0 +1,42 @@
+import pandas as pd
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+
+# Step 1: Load dataset from CSV
+df = pd.read_csv('diabetes.csv')
+
+# Step 2: Separate features and target
+X = df.drop('Outcome', axis=1)  # all features
+y = df['Outcome']               # target column
+
+# Step 3: Chi-Square test requires non-negative values
+X_chi2 = X.copy()
+X_chi2 = X_chi2 - X_chi2.min()
+
+# Step 4: Apply Chi-Square Test to select top 5 features
+selector = SelectKBest(score_func=chi2, k=5)
+X_new = selector.fit_transform(X_chi2, y)
+
+# Step 5: Get selected feature names
+selected_indices = selector.get_support(indices=True)
+selected_features = [X.columns[i] for i in selected_indices]
+
+print("Top 5 selected features by Chi-Square Test:")
+print(selected_features)
+
+# Step 6: Get Chi2 scores for all features
+scores = selector.scores_
+feature_scores = pd.DataFrame({'Feature': X.columns, 'Chi2 Score': scores})
+print("\nChi2 Scores for all features:")
+print(feature_scores.sort_values(by='Chi2 Score', ascending=False))
+
+# Step 7: Plot Chi2 scores for all features
+plt.figure(figsize=(10, 6))
+plt.bar(feature_scores['Feature'], feature_scores['Chi2 Score'], color='lightcoral')
+plt.title('Chi-Square Scores for Diabetes Dataset Features')
+plt.xlabel('Feature')
+plt.ylabel('Chi2 Score')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
