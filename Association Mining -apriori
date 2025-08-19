@@ -1,0 +1,49 @@
+
+import kagglehub
+import pandas as pd
+from mlxtend.frequent_patterns import apriori, association_rules
+import matplotlib.pyplot as plt
+
+# Step 1: Download dataset
+path = kagglehub.dataset_download("heeraldedhia/groceries-dataset")
+print("Path to dataset files:", path)
+
+# Step 2: Load dataset
+# The groceries dataset usually comes as 'Groceries_dataset.csv'
+df = pd.read_csv(path + "/Groceries_dataset.csv")
+
+print(df.head())
+
+# Step 3: Data preprocessing
+# Dataset usually has columns like Member_number, Date, itemDescription
+# We need transactions grouped by each customer/date
+basket = df.groupby(['Member_number', 'Date'])['itemDescription'].apply(list).reset_index()
+
+# Step 4: Convert transactions into one-hot encoded format
+from mlxtend.preprocessing import TransactionEncoder
+
+te = TransactionEncoder()
+te_ary = te.fit(basket['itemDescription']).transform(basket['itemDescription'])
+transactions = pd.DataFrame(te_ary, columns=te.columns_)
+
+# Step 5: Apply Apriori algorithm
+frequent_itemsets = apriori(transactions, min_support=0.001, use_colnames=True)
+
+# Step 6: Generate association rules
+rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
+
+# Step 7: Sort by confidence or lift and get top 10
+top10 = rules.sort_values(by="confidence", ascending=False).head(10)
+print("\nTop 10 product pairs bought together:\n", top10[['antecedents', 'consequents', 'support', 'confidence', 'lift']])
+
+# Step 8: Plot results
+plt.figure(figsize=(10,6))
+plt.barh(
+    [f"{list(a)[0]} + {list(c)[0]}" for a,c in zip(top10['antecedents'], top10['consequents'])],
+    top10['confidence']
+)
+plt.xlabel("Confidence")
+plt.ylabel("Product Pair")
+plt.title("Top 10 Most Frequently Bought-Together Products")
+plt.gca().invert_yaxis()
+plt.show()
