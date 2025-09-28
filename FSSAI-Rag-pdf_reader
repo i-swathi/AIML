@@ -1,0 +1,74 @@
+# Install required packages (if running locally)
+# !pip install faiss-cpu sentence-transformers PyPDF2 transformers
+#minimal working RAG example with a PDF.We’ll:
+    #Load a PDF.
+    #Split it into chunks.
+    #Create embeddings and store them in FAISS.
+    #Ask a question, retrieve relevant chunks, and generate an answer from the model.
+
+import faiss
+import PyPDF2
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline
+
+# -----------------------------
+# Step 1: Load PDF
+# -----------------------------
+pdf_path = "sample.pdf"  # replace with your PDF path
+pdf_reader = PyPDF2.PdfReader(pdf_path)
+pages = [page.extract_text() for page in pdf_reader.pages]
+
+# -----------------------------
+# Step 2: Split PDF into chunks
+# -----------------------------
+chunks = []
+for i, text in enumerate(pages):
+    if text:
+        for part in text.split("\n"):
+            if part.strip():
+                chunks.append({"page": i+1, "text": part.strip()})
+
+# -----------------------------
+# Step 3: Create embeddings
+# -----------------------------
+model_embed = SentenceTransformer("all-MiniLM-L6-v2")
+texts = [c["text"] for c in chunks]
+embeddings = model_embed.encode(texts)
+
+# -----------------------------
+# Step 4: Store embeddings in FAISS
+# -----------------------------
+dimension = embeddings.shape[1]
+index = faiss.IndexFlatL2(dimension)
+index.add(embeddings)
+
+# -----------------------------
+# Step 5: Ask a question
+# -----------------------------
+query = "What does this book say about machine learning?"
+query_vector = model_embed.encode([query])
+distances, indices = index.search(query_vector, k=3)  # top 3 chunks
+
+# -----------------------------
+# Step 6: Build RAG prompt
+# -----------------------------
+context = "\n".join([chunks[idx]['text'] for idx in indices[0]])
+rag_prompt = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+
+# -----------------------------
+# Step 7: Generate answer
+# -----------------------------
+generator = pipeline(
+    "text-generation",
+    model="HuggingFaceTB/SmolLM2-360M-Instruct"
+)
+
+answer = generator(rag_prompt, max_length=150, do_sample=True)[0]["generated_text"]
+
+# -----------------------------
+# Step 8: Show results
+# -----------------------------
+print("----RAG Prompt----")
+print(rag_prompt)
+print("\n----RAG Answer----")
+print(answer)
