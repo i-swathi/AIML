@@ -1,0 +1,56 @@
+#Using the Weather-Wind-Play dataset (binary categorical), write code to train a Decision Tree Classifier using Gini index. Visualize the tree and explain each split.
+
+
+
+#Step 1: Load the data and preprocess
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+import matplotlib.pyplot as plt
+
+# Sample Weather-Wind-Play dataset
+data = {
+    'Weather': ['Sunny', 'Sunny', 'Overcast', 'Rain', 'Rain', 'Overcast', 'Sunny', 'Rain'],
+    'Wind':    ['Weak',  'Strong','Weak',     'Weak', 'Strong','Strong',  'Weak',  'Weak'],
+    'Play':    ['Yes',   'No',    'Yes',      'Yes',  'No',    'Yes',     'No',    'Yes']
+}
+
+df = pd.DataFrame(data)
+
+# Convert categorical data into numbers
+df_encoded = pd.get_dummies(df[['Weather', 'Wind']])
+y = df['Play'].map({'Yes':1, 'No':0})   # target as binary
+
+#Step 2: Train Decision Tree using Gini Index
+clf = DecisionTreeClassifier(criterion="gini", random_state=42)
+clf.fit(df_encoded, y)
+for i in range(clf.tree_.node_count):
+    print(f"Node {i}: Gini={clf.tree_.impurity[i]:.3f}, samples={clf.tree_.n_node_samples[i]}, feature={clf.tree_.feature[i]}")
+
+#Step 3: Visualize the Tree
+plt.figure(figsize=(10,6))
+plot_tree(clf, feature_names=df_encoded.columns, class_names=['No','Yes'], filled=True)
+plt.show()
+
+#New data for prediction
+
+# New unseen samples
+new_data = pd.DataFrame({
+    'Weather': ['Sunny', 'Rain', 'Overcast', 'Sunny'],
+    'Wind': ['Strong', 'Weak', 'Weak', 'Weak']
+})
+new_encoded = pd.get_dummies(new_data)
+# Make sure all columns exist like in training (fill missing with 0)
+for col in df_encoded.columns:
+    if col not in new_encoded.columns:
+        new_encoded[col] = 0
+
+# Reorder columns to match training
+new_encoded = new_encoded[df_encoded.columns]
+
+# Predicting with the tree
+predictions = clf.predict(new_encoded)
+predictions_text = ['Yes' if p==1 else 'No' for p in predictions]
+
+print("Predictions for new data:")
+print(pd.concat([new_data, pd.Series(predictions_text, name='Predicted_Play')], axis=1))
+#creates a new column predict_play and concatentes it to thr new_data dateframe which has the data which we need to test
