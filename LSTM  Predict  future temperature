@@ -1,0 +1,83 @@
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+
+# ----------------------------
+# Step 0: Create dummy dataset
+# ----------------------------
+data = {
+    'Date': pd.date_range(start='2025-10-01', periods=10, freq='D'),
+    'Temperature': [25, 26, 27, 26, 28, 29, 30, 31, 30, 32],
+    'Humidity': [60, 62, 61, 63, 64, 65, 66, 67, 65, 68]
+}
+df = pd.DataFrame(data)
+df.set_index('Date', inplace=True)
+
+print("Original DataFrame:")
+print(df)
+
+# ----------------------------
+# Step 1: Scale features
+# ----------------------------
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaled_data = scaler.fit_transform(df.values)
+
+# ----------------------------
+# Step 2: Create dataset for LSTM
+# ----------------------------
+def create_dataset(data, time_step=3):
+    X, y = [], []
+    for i in range(len(data) - time_step):
+        X.append(data[i:(i + time_step)])
+        y.append(data[i + time_step])
+    return np.array(X), np.array(y)
+
+time_step = 3
+X, y = create_dataset(scaled_data, time_step)
+
+# ----------------------------
+# Step 3: Build LSTM model
+# ----------------------------
+model = Sequential()
+model.add(LSTM(50, input_shape=(X.shape[1], X.shape[2])))
+model.add(Dense(2))  # predicting Temperature & Humidity
+model.compile(optimizer='adam', loss='mse')
+
+# ----------------------------
+# Step 4: Train the model
+# ----------------------------
+model.fit(X, y, epochs=50, batch_size=1, verbose=1)
+
+# ----------------------------
+# Step 5: Multi-step prediction (next 5 days)
+# ----------------------------
+future_days = 5
+predictions = []
+
+# Start with last 'time_step' data points
+last_sequence = scaled_data[-time_step:]
+
+for _ in range(future_days):
+    input_seq = last_sequence.reshape(1, time_step, 2)
+    next_pred_scaled = model.predict(input_seq)
+    predictions.append(next_pred_scaled[0])
+    last_sequence = np.vstack([last_sequence[1:], next_pred_scaled])
+
+# Inverse scale predictions
+predictions_original = scaler.inverse_transform(predictions)
+
+# ----------------------------
+# Step 6: Combine original + predicted data
+# ----------------------------
+# Create future dates
+future_dates = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=future_days)
+
+# Create DataFrame for predictions
+predicted_df = pd.DataFrame(predictions_original, columns=['Temperature', 'Humidity'], index=future_dates)
+
+# Combine original + predicted
+combined_df = pd.concat([df, predicted_df])
+print("\nOriginal + Predicted Data:")
+print(combined_df)
